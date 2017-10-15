@@ -361,10 +361,20 @@ module Isuconp
         db.prepare(query).execute(
           me[:id],
           mime,
-          params["file"][:tempfile].read,
+          1,
           params["body"],
         )
         pid = db.last_id
+
+        ext = ""
+        if mime == "image/jpeg"
+          ext = ".jpg"
+        elsif mime == "image/png"
+          ext = ".png"
+        elsif mime == "image/gif"
+          ext = ".gif"
+        end
+        File.write("/home/isucon/private_isu/webapp/public/image/#{pid}#{ext}", params["file"][:tempfile].read)
 
         redirect "/posts/#{pid}", 302
       else
@@ -373,6 +383,7 @@ module Isuconp
       end
     end
 
+    # アクセスされない
     get '/image/:id.:ext' do
       if params[:id].to_i == 0
         return ""
@@ -389,6 +400,21 @@ module Isuconp
       end
 
       return 404
+    end
+
+    get '/convert_image' do
+      (1...10000).each do |i|
+        post = db.prepare('SELECT * FROM `posts` WHERE id = ?').execute(i).first
+        ext = ""
+        if post[:mime] == "image/jpeg"
+          ext = ".jpg"
+        elsif post[:mime] == "image/png"
+          ext = ".png"
+        elsif post[:mime] == "image/gif"
+          ext = ".gif"
+        end
+        File.write("/home/isucon/private_isu/webapp/public/image/#{post[:id]}#{ext}", post[:imgdata])
+      end
     end
 
     post '/comment' do
