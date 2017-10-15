@@ -402,7 +402,7 @@ module Isuconp
     end
 
     get '/convert_image' do
-      results = db.query('SELECT * FROM `posts` WHERE id > 10000')
+      results = db.query('SELECT * FROM `posts` WHERE id <= 10000')
       results.to_a.each do |post|
         ext = ""
         if post[:mime] == "image/jpeg"
