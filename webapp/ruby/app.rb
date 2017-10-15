@@ -310,7 +310,7 @@ module Isuconp
 
     get '/posts/:id' do
       # TODO INDEX貼ってる？
-      results = db.prepare('SELECT * FROM `posts` WHERE `id` = ? LIMIT 20').execute(
+      results = db.prepare('SELECT * FROM `posts` WHERE `id` = ?').execute(
         params[:id]
       )
       posts = make_posts(results, all_comments: true)
