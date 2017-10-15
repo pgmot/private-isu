@@ -373,7 +373,7 @@ module Isuconp
         elsif mime == "image/gif"
           ext = ".gif"
         end
-        File.write("./image/#{last_id}.#{ext}", params["file"][:tempfile].read)
+        File.write("/home/isucon/private_isu/webapp/public/image/#{last_id}#{ext}", params["file"][:tempfile].read)
 
         redirect "/posts/#{pid}", 302
       else
@@ -412,7 +412,7 @@ module Isuconp
         elsif post[:mime] == "image/gif"
           ext = ".gif"
         end
-        File.write("/home/isucon/private_isu/webapp/public/image/#{post[:id]}.#{ext}", post[:imgdata])
+        File.write("/home/isucon/private_isu/webapp/public/image/#{post[:id]}#{ext}", post[:imgdata])
       end
     end
 
