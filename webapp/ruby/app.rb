@@ -124,7 +124,7 @@ module Isuconp
 
           # TODO N+1っぽい
           comments.each do |comment|
-            comment[:user] = fetch_user(user_id)
+            comment[:user] = fetch_user(comment[:user_id])
           end
 
           post[:comments] = comments.reverse
