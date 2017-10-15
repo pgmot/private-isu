@@ -2,6 +2,7 @@ require 'sinatra/base'
 require 'mysql2'
 require 'rack-flash'
 require 'shellwords'
+require 'openssl'
 require 'dotenv'
 Dotenv.load
 
@@ -85,7 +86,7 @@ module Isuconp
       def digest(src)
         # opensslのバージョンによっては (stdin)= というのがつくので取る
         # TODO これ遅ない？毎回プロセス立ち上がってるのでは
-        `printf "%s" #{Shellwords.shellescape(src)} | openssl dgst -sha512 | sed 's/^.*= //'`.strip
+        OpenSSL::Digest::SHA512.hexdigest(Shellwords.shellescape(src))
       end
 
       def calculate_salt(account_name)
