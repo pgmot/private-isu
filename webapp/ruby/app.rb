@@ -55,6 +55,7 @@ module Isuconp
       end
 
       def try_login(account_name, password)
+        # TODO フラグの選択性をチェックしたい
         user = db.prepare('SELECT * FROM users WHERE account_name = ? AND del_flg = 0').execute(account_name).first
 
         if user && calculate_passhash(user[:account_name], password) == user[:passhash]
@@ -76,6 +77,7 @@ module Isuconp
 
       def digest(src)
         # opensslのバージョンによっては (stdin)= というのがつくので取る
+        # TODO これ遅ない？毎回プロセス立ち上がってるのでは
         `printf "%s" #{Shellwords.shellescape(src)} | openssl dgst -sha512 | sed 's/^.*= //'`.strip
       end
 
@@ -89,6 +91,7 @@ module Isuconp
 
       def get_session_user()
         if session[:user]
+          # TODO インデックス貼ってる？
           db.prepare('SELECT * FROM `users` WHERE `id` = ?').execute(
             session[:user][:id]
           ).first
@@ -99,25 +102,35 @@ module Isuconp
 
       def make_posts(results, all_comments: false)
         posts = []
+
+        # TODO N+1みたいな感じある
         results.to_a.each do |post|
+          # TODO インデックス大丈夫？
           post[:comment_count] = db.prepare('SELECT COUNT(*) AS `count` FROM `comments` WHERE `post_id` = ?').execute(
             post[:id]
           ).first[:count]
 
+          # TODO インデックス大丈夫？
           query = 'SELECT * FROM `comments` WHERE `post_id` = ? ORDER BY `created_at` DESC'
           unless all_comments
             query += ' LIMIT 3'
           end
+
           comments = db.prepare(query).execute(
             post[:id]
           ).to_a
+
+          # TODO N+1っぽい
           comments.each do |comment|
+            # TODO インデックス大丈夫？
             comment[:user] = db.prepare('SELECT * FROM `users` WHERE `id` = ?').execute(
               comment[:user_id]
             ).first
           end
+
           post[:comments] = comments.reverse
 
+          # TODO インデックス大丈夫か？
           post[:user] = db.prepare('SELECT * FROM `users` WHERE `id` = ?').execute(
             post[:user_id]
           ).first
@@ -165,6 +178,7 @@ module Isuconp
         session[:user] = {
           id: user[:id]
         }
+        # TODO SecureRandomじゃなくせば早くなるかも
         session[:csrf_token] = SecureRandom.hex(16)
         redirect '/', 302
       else
@@ -195,13 +209,16 @@ module Isuconp
         return
       end
 
+      # TODO インデックス大丈夫？
       user = db.prepare('SELECT 1 FROM users WHERE `account_name` = ?').execute(account_name).first
+
       if user
         flash[:notice] = 'アカウント名がすでに使われています'
         redirect '/register', 302
         return
       end
 
+      # TODO まあ個々は大丈夫？
       query = 'INSERT INTO `users` (`account_name`, `passhash`) VALUES (?,?)'
       db.prepare(query).execute(
         account_name,
@@ -211,6 +228,7 @@ module Isuconp
       session[:user] = {
         id: db.last_id
       }
+      # TODO SecureRandom遅かったりしない？ => "%032x" % (rand * 1e32).to_i のが早い
       session[:csrf_token] = SecureRandom.hex(16)
       redirect '/', 302
     end
@@ -223,6 +241,7 @@ module Isuconp
     get '/' do
       me = get_session_user()
 
+      # TODO 全件取得する必要あるか？
       results = db.query('SELECT `id`, `user_id`, `body`, `created_at`, `mime` FROM `posts` ORDER BY `created_at` DESC')
       posts = make_posts(results)
 
@@ -230,6 +249,7 @@ module Isuconp
     end
 
     get '/@:account_name' do
+      # TODO 選択性とINDEX大丈夫か？
       user = db.prepare('SELECT * FROM `users` WHERE `account_name` = ? AND `del_flg` = 0').execute(
         params[:account_name]
       ).first
@@ -238,6 +258,7 @@ module Isuconp
         return 404
       end
 
+      # TODO 全件要る？ INDEX大丈夫？
       results = db.prepare('SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `posts` WHERE `user_id` = ? ORDER BY `created_at` DESC').execute(
         user[:id]
       )
@@ -247,6 +268,7 @@ module Isuconp
         user[:id]
       ).first[:count]
 
+      # TODO INDEX大丈夫？
       post_ids = db.prepare('SELECT `id` FROM `posts` WHERE `user_id` = ?').execute(
         user[:id]
       ).map{|post| post[:id]}
@@ -266,8 +288,15 @@ module Isuconp
     end
 
     get '/posts' do
+      # TODO max_created_at
       max_created_at = params['max_created_at']
+
+      # TODO 選択性どうなの。ある時点以前のやつ取ってくるならレコードの数は一定のはず。でも、普通のサービス考えると投稿が増える度にドンドン選択性悪くなってくる。ある時点以降のツイートのみを除去するみたいなコードは微妙な気もするし...。
+      # TODO created_atにINDEX要るのでは。
+      # TODO ある時点以前に作られたのを降順（新しい順）で取ってくるはず
+      # TODO 全件要るのか？
       results = db.prepare('SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `posts` WHERE `created_at` <= ? ORDER BY `created_at` DESC').execute(
+        # TODO 何やってるのコレ?? 
         max_created_at.nil? ? nil : Time.iso8601(max_created_at).localtime
       )
       posts = make_posts(results)
@@ -276,6 +305,7 @@ module Isuconp
     end
 
     get '/posts/:id' do
+      # TODO INDEX貼ってる？
       results = db.prepare('SELECT * FROM `posts` WHERE `id` = ?').execute(
         params[:id]
       )
@@ -290,6 +320,7 @@ module Isuconp
       erb :post, layout: :layout, locals: { post: post, me: me }
     end
 
+    # 画像の投稿を行ってる所っぽい
     post '/' do
       me = get_session_user()
 
@@ -322,6 +353,7 @@ module Isuconp
 
         params['file'][:tempfile].rewind
         query = 'INSERT INTO `posts` (`user_id`, `mime`, `imgdata`, `body`) VALUES (?,?,?,?)'
+        # TODO トランザクション処理要らないのかな
         db.prepare(query).execute(
           me[:id],
           mime,
@@ -342,6 +374,7 @@ module Isuconp
         return ""
       end
 
+      # TODO インデックス大丈夫？
       post = db.prepare('SELECT * FROM `posts` WHERE `id` = ?').execute(params[:id].to_i).first
 
       if (params[:ext] == "jpg" && post[:mime] == "image/jpeg") ||
@@ -391,6 +424,7 @@ module Isuconp
         return 403
       end
 
+      # TODO 選択性どうなの〜
       users = db.query('SELECT * FROM `users` WHERE `authority` = 0 AND `del_flg` = 0 ORDER BY `created_at` DESC')
 
       erb :banned, layout: :layout, locals: { users: users, me: me }
