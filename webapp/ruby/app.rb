@@ -252,7 +252,7 @@ module Isuconp
       me = get_session_user()
 
       # TODO 全件取得する必要あるか？
-      results = db.query('SELECT `id`, `user_id`, `body`, `created_at`, `mime` FROM `posts` ORDER BY `created_at` DESC')
+      results = db.query('SELECT `id`, `user_id`, `body`, `created_at`, `mime` FROM `posts` ORDER BY `created_at` DESC LIMIT 20')
       posts = make_posts(results)
 
       erb :index, layout: :layout, locals: { posts: posts, me: me }
@@ -269,7 +269,7 @@ module Isuconp
       end
 
       # TODO 全件要る？ INDEX大丈夫？
-      results = db.prepare('SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `posts` WHERE `user_id` = ? ORDER BY `created_at` DESC').execute(
+      results = db.prepare('SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `posts` WHERE `user_id` = ? ORDER BY `created_at` DESC LIMIT 20').execute(
         user[:id]
       )
       posts = make_posts(results)
@@ -305,7 +305,7 @@ module Isuconp
       # TODO created_atにINDEX要るのでは。
       # TODO ある時点以前に作られたのを降順（新しい順）で取ってくるはず
       # TODO 全件要るのか？
-      results = db.prepare('SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `posts` WHERE `created_at` <= ? ORDER BY `created_at` DESC').execute(
+      results = db.prepare('SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `posts` WHERE `created_at` <= ? ORDER BY `created_at` DESC LIMIT 20').execute(
         # TODO 何やってるのコレ??
         max_created_at.nil? ? nil : Time.iso8601(max_created_at).localtime
       )
