@@ -1,5 +1,3 @@
-require 'rack/session/dalli'
-
 require_relative './app.rb'
 
 require 'dotenv'
