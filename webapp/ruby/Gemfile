@@ -8,3 +8,8 @@ gem "foreman"
 gem "unicorn"
 gem "mysql2"
 gem "rack-flash3"
+
+gem 'stackprof'
+gem 'dotenv'
+gem 'mysql2-client-general_log', github: 'ABCanG/mysql2-client-general_log', branch: 'writefile'
+
