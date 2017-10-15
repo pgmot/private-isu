@@ -173,8 +173,8 @@ module Isuconp
           account_name: user[:account_name],
           authority: user[:authority]
         }
-        # TODO SecureRandomじゃなくせば早くなるかも
-        session[:csrf_token] = SecureRandom.hex(16)
+        # TODO SecureRandomじゃなくせば早くなるかも => 固定にしてみた
+        session[:csrf_token] =  "351ab64768352194b93b23432b0f072b"
         redirect '/', 302
       else
         flash[:notice] = 'アカウント名かパスワードが間違っています'
