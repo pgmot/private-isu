@@ -90,14 +90,7 @@ module Isuconp
       end
 
       def get_session_user()
-        if session[:user]
-          # TODO インデックス貼ってる？
-          db.prepare('SELECT * FROM `users` WHERE `id` = ?').execute(
-            session[:user][:id]
-          ).first
-        else
-          nil
-        end
+        session[:user] || nil
       end
 
       def make_posts(results, all_comments: false)
@@ -176,7 +169,9 @@ module Isuconp
       user = try_login(params['account_name'], params['password'])
       if user
         session[:user] = {
-          id: user[:id]
+          id: user[:id],
+          account_name: user[:account_name],
+          authority: user[:authority]
         }
         # TODO SecureRandomじゃなくせば早くなるかも
         session[:csrf_token] = SecureRandom.hex(16)
@@ -226,7 +221,9 @@ module Isuconp
       )
 
       session[:user] = {
-        id: db.last_id
+        id: db.last_id,
+        account_name: account_name,
+        authority: 0
       }
       # TODO SecureRandom遅かったりしない？ => "%032x" % (rand * 1e32).to_i のが早い
       session[:csrf_token] = SecureRandom.hex(16)
@@ -296,7 +293,7 @@ module Isuconp
       # TODO ある時点以前に作られたのを降順（新しい順）で取ってくるはず
       # TODO 全件要るのか？
       results = db.prepare('SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `posts` WHERE `created_at` <= ? ORDER BY `created_at` DESC').execute(
-        # TODO 何やってるのコレ?? 
+        # TODO 何やってるのコレ??
         max_created_at.nil? ? nil : Time.iso8601(max_created_at).localtime
       )
       posts = make_posts(results)
