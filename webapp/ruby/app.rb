@@ -2,6 +2,13 @@ require 'sinatra/base'
 require 'mysql2'
 require 'rack-flash'
 require 'shellwords'
+require 'dotenv'
+Dotenv.load
+
+if ENV['SQLLOG'] == '1'
+  puts 'enable sqllog'
+  require "mysql2/client/general_log"
+end
 
 module Isuconp
   class App < Sinatra::Base
