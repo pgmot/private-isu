@@ -356,15 +356,24 @@ module Isuconp
         end
 
         params['file'][:tempfile].rewind
-        query = 'INSERT INTO `posts` (`user_id`, `mime`, `imgdata`, `body`) VALUES (?,?,?,?)'
+        query = 'INSERT INTO `posts` (`user_id`, `mime`, `body`) VALUES (?,?,?,?)'
         # TODO トランザクション処理要らないのかな
         db.prepare(query).execute(
           me[:id],
           mime,
-          params["file"][:tempfile].read,
           params["body"],
         )
         pid = db.last_id
+
+        ext = ""
+        if mime == "image/jpeg"
+          ext = ".jpg"
+        elsif mime == "image/png"
+          ext = ".png"
+        elsif mime == "image/gif"
+          ext = ".gif"
+        end
+        File.write("./image/#{last_id}.#{ext}", params["file"][:tempfile].read)
 
         redirect "/posts/#{pid}", 302
       else
@@ -373,6 +382,7 @@ module Isuconp
       end
     end
 
+    # アクセスされない
     get '/image/:id.:ext' do
       if params[:id].to_i == 0
         return ""
@@ -389,6 +399,21 @@ module Isuconp
       end
 
       return 404
+    end
+
+    get '/convert_image' do
+      results = db.query('SELECT * FROM `posts` WHERE id > 10000')
+      results.to_a.each do |post|
+        ext = ""
+        if post[:mime] == "image/jpeg"
+          ext = ".jpg"
+        elsif post[:mime] == "image/png"
+          ext = ".png"
+        elsif post[:mime] == "image/gif"
+          ext = ".gif"
+        end
+        File.write("/home/isucon/private_isu/webapp/public/image/#{post[:id]}.#{ext}", post[:imgdata])
+      end
     end
 
     post '/comment' do
