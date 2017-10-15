@@ -103,39 +103,32 @@ module Isuconp
       def make_posts(results, all_comments: false)
         posts = []
 
-        # TODO N+1みたいな感じある
-        results.to_a.each do |post|
-          # TODO インデックス大丈夫？
-          post[:comment_count] = db.prepare('SELECT COUNT(*) AS `count` FROM `comments` WHERE `post_id` = ?').execute(
-            post[:id]
-          ).first[:count]
+        post_ids = results.map{|e| e[:post_id] }
+        post_ids_join = post_ids.join(", ")
 
-          # TODO インデックス大丈夫？
-          query = 'SELECT * FROM `comments` WHERE `post_id` = ? ORDER BY `created_at` DESC'
-          unless all_comments
-            query += ' LIMIT 3'
-          end
+        group_by_post_id = lambda { |e| e[:post_id] }
 
-          comments = db.prepare(query).execute(
-            post[:id]
-          ).to_a
+        # COUNT
+        counts = db.prepare("SELECT `post_id`, COUNT(*) AS `count` FROM `comments` WHERE `post_id` IN (#{post_ids_join}) GROUP BY `post_id`" ).execute.group_by(&group_by_post_id)
 
-          # TODO N+1っぽい
-          comments.each do |comment|
-            # TODO インデックス大丈夫？
-            comment[:user] = db.prepare('SELECT * FROM `users` WHERE `id` = ?').execute(
-              comment[:user_id]
-            ).first
-          end
+        # COMMENTS
+        query = "SELECT * FROM `comments` LEFT JOIN `users` ON comments.user_id = users.id WHERE `post_id` IN (#{post_ids_join}) ORDER BY `created_at` DESC"
+        unless all_comments
+          query += ' LIMIT 3'
+        end
+        comments = db.prepare(query).execute.to_a.group_by(&group_by_post_id)
 
-          post[:comments] = comments.reverse
+        # POST_USERS
+        users = results.map{|e| e[:user_id] }
+        post_users = db.prepare("SELECT * FROM `users` WHERE `id` IN ( #{users.join(", ")} )").execute.group_by {|e| e[:user_id] }
 
-          # TODO インデックス大丈夫か？
-          post[:user] = db.prepare('SELECT * FROM `users` WHERE `id` = ?').execute(
-            post[:user_id]
-          ).first
+        # 突き合わせ処理
+        results.each do |result|
+          result[:user] = users[ result[:user_id] ]
+          result[:comment_count] = counts[ result[:post_id] ]
+          result[:comments] = comments[ result[:post_id] ].reverse
 
-          posts.push(post) if post[:user][:del_flg] == 0
+          posts.push(result) if post[:user][:del_flg] == 0
           break if posts.length >= POSTS_PER_PAGE
         end
 
