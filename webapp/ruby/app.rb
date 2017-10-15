@@ -356,11 +356,12 @@ module Isuconp
         end
 
         params['file'][:tempfile].rewind
-        query = 'INSERT INTO `posts` (`user_id`, `mime`, `body`) VALUES (?,?,?,?)'
+        query = 'INSERT INTO `posts` (`user_id`, `mime`, `imgdata`, `body`) VALUES (?,?,?,?)'
         # TODO トランザクション処理要らないのかな
         db.prepare(query).execute(
           me[:id],
           mime,
+          1,
           params["body"],
         )
         pid = db.last_id
