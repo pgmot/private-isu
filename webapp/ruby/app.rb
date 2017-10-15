@@ -2,6 +2,7 @@ require 'sinatra/base'
 require 'mysql2'
 require 'rack-flash'
 require 'shellwords'
+require 'dalli'
 require 'dotenv'
 Dotenv.load
 
@@ -12,9 +13,10 @@ end
 
 module Isuconp
   class App < Sinatra::Base
-    use Rack::Session::Memcache, autofix_keys: true, secret: ENV['ISUCONP_SESSION_SECRET'] || 'sendagaya'
+    use Rack::Session::Dalli, :expire_after => nil, :memcache_server => '127.0.0.1:11211'
     use Rack::Flash
     set :public_folder, File.expand_path('../../public', __FILE__)
+    set :cache, Dalli::Client.new
 
     UPLOAD_LIMIT = 10 * 1024 * 1024 # 10mb
 
@@ -122,24 +124,28 @@ module Isuconp
 
           # TODO N+1っぽい
           comments.each do |comment|
-            # TODO インデックス大丈夫？
-            comment[:user] = db.prepare('SELECT * FROM `users` WHERE `id` = ?').execute(
-              comment[:user_id]
-            ).first
+            comment[:user] = fetch_user(user_id)
           end
 
           post[:comments] = comments.reverse
 
           # TODO インデックス大丈夫か？
-          post[:user] = db.prepare('SELECT * FROM `users` WHERE `id` = ?').execute(
-            post[:user_id]
-          ).first
+          post[:user] = fetch_user(post[:user_id])
 
           posts.push(post) if post[:user][:del_flg] == 0
           break if posts.length >= POSTS_PER_PAGE
         end
 
         posts
+      end
+
+      def fetch_user(user_id)
+        user = settings.cache.get("user#{user_id}")
+        return user if user
+
+        user = db.prepare('SELECT * FROM `users` WHERE `id` = ?').execute(user_id).first
+        settings.cache.set("user#{user_id}", user)
+        user
       end
 
       def image_url(post)
